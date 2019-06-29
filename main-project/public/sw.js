@@ -6,6 +6,35 @@
 const CACHE_STATIC_NAME = 'static-v4';
 const CACHE_DYNAMIC_NAME = 'dynamic-v4';
 const fetchUrl = 'https://httpbin.org/get';
+const STATIC_FILES = [
+    '/',
+    '/index.html',
+    '/offline.html',
+    // '/help/index.html', // Will be cached on request,
+    '/src/js/app.js',
+    '/src/js/feed.js',
+    '/src/js/promise.js',
+    '/src/js/fetch.js',
+    '/src/js/material.min.js',
+    '/src/css/app.css',
+    '/src/css/feed.css',
+    '/src/images/main-image.jpg',
+    'https://fonts.googleapis.com/css?family=Roboto:400,700',
+    'https://fonts.googleapis.com/icon?family=Material+Icons',
+    'https://cdnjs.cloudflare.com/ajax/libs/material-design-lite/1.3.0/material.indigo-pink.min.css'
+];
+
+// Cleans up the cache
+// const trimCache = (cacheName, maxItems) => {
+//     caches.open(cacheName).then((cache) => {
+//         return cache.keys().then((keys) => {
+//             if (keys.length > maxItems) {
+//                 // Deletes oldest cache item until maxItems is reached
+//                 cache.delete(keys[0]).then(trimCache(cacheName, maxItems));
+//             }
+//         });
+//     });
+// }
 
 self.addEventListener('install', function(event) {
     // console.log('install', event);
@@ -16,23 +45,7 @@ self.addEventListener('install', function(event) {
         // cache.add('/index.html');
         // cache.add('/src/js/app.js');
 
-        cache.addAll([
-            '/',
-            '/index.html',
-            '/offline.html',
-            // '/help/index.html', // Will be cached on request
-            '/src/js/app.js',
-            '/src/js/feed.js',
-            '/src/js/material.min.js',
-            '/src/css/app.css',
-            '/src/css/feed.css',
-            '/src/images/main-image.jpg',
-            'https://fonts.googleapis.com/css?family=Roboto:400,700',
-            'https://fonts.googleapis.com/icon?family=Material+Icons',
-            'https://cdnjs.cloudflare.com/ajax/libs/material-design-lite/1.3.0/material.indigo-pink.min.css',
-            //'/src/js/promise.js', // Not needed
-            //'/src/js/fetch.js', // Not needed
-        ]);
+        cache.addAll(STATIC_FILES);
     }));
 });
 
@@ -73,33 +86,46 @@ self.addEventListener('fetch', function (event) {
         event.respondWith(
             caches.open(CACHE_DYNAMIC_NAME).then(function (cache) {
                 return fetch(event.request).then((res) => {
+                    // trimCache(CACHE_DYNAMIC_NAME, 3); // Browser Storage API
+
                     cache.put(event.request, res.clone());
 
                     return res;
                 });
             })
         );
+    } else if (new RegExp('\\b' + STATIC_FILES.join('\\b|\\b') + '\\b').test(event.request.url)) {
+        // Return known static file from cache
+        event.respondWith(caches.match(event.request));
     } else {
         // Cache with network fallback Strategy
-        caches.match(event.request).then(function (response) {
-            if (response) {
-                return response;
-            } else {
-                return fetch(event.request).then((res) => {
-                    caches.open(CACHE_DYNAMIC_NAME).then(function (cache) {
-                        // Dynamically cache elements
-                        cache.put(event.request.url, res.clone()); // Response is consumed only once, need to clone
+        event.respondWith(
+            caches.match(event.request).then(function (response) {
+                if (response) {
+                    return response;
+                } else {
+                    return fetch(event.request).then((res) => {
+                        caches.open(CACHE_DYNAMIC_NAME).then(function (cache) {
+                            // Dynamically cache elements
+                            cache.put(event.request.url, res.clone()); // Response is consumed only once, need to clone
 
-                        return res;
+                            return res;
+                        });
+                    }).catch((error) => {
+                        // Serve Offline page if page is not cached yet
+                        return caches.open(CACHE_STATIC_NAME).then(function (cache) {
+                            // If help page
+                            // if (event.request.url.indexOf('/help')) {
+                            // If any html page
+                            if (event.request.headers.get('accept').includes('text/html')) {
+                                return cache.match('/offline.html');    
+                            }
+                            // Could add placeholder image for images headers
+                        });
                     });
-                }).catch((error) => {
-                    // Serve Offline page if page is not cached yet
-                    return caches.open(CACHE_STATIC_NAME).then(function (cache) {
-                        return cache.match('/offline.html');
-                    });
-                });
-            } 
-        });
+                }
+            })
+        );
     }
 
     // Check if element exists in cache

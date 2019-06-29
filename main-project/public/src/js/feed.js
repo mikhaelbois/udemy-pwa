@@ -24,6 +24,15 @@ function openCreatePostModal() {
 
     deferredPrompt = null;
   }
+
+  // if ('serviceWorker' in navigator) {
+  //   // Unregister SW in all pages
+  //   navigator.serviceWorker.getRegistrations().then((registrations) => {
+  //     registrations.forEach(registration => {
+  //       registration.unregister(); // Also clears cache
+  //     });
+  //   });
+  // }
 }
 
 function closeCreatePostModal() {
@@ -36,7 +45,7 @@ function onSaveButtonClicked(event) {
   // Cache new element on save
   if ('caches' in window) { // Needs to be validated on Frontend
     caches.open(CACHE_USER_NAME).then(function (cache) {
-      cache.addAll([
+      caches.addAll([
         'https://httpbin.org/get',
         '/src/images/sf-boat.jpg'
       ]);
@@ -96,9 +105,30 @@ fetch(fetchUrl)
     createCard();
   });
 
+// POST Example
+// Cache does not saves POST Requests, only response
+// fetch(fetchUrl, {
+//   method: 'POST',
+//   headers: {
+//     'Content-Type': 'application/json',
+//     'Accept': 'application/json'
+//   },
+//   body: JSON.stringify({
+//     message: 'Somme message'
+//   })
+// })
+//   .then(function (res) {
+//     return res.json();
+//   })
+//   .then(function (data) {
+//     networkDataReceived = true;
+//     clearCards();
+//     createCard();
+//   });
+
 
 if ('caches' in window) { // Needs to be validated on Frontend
-  cache.match(fetchUrl).then((response) => {
+  caches.match(fetchUrl).then((response) => {
     if (response) {
       return response.json();
     }
